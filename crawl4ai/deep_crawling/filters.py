@@ -56,7 +56,7 @@ class URLFilter(ABC):
         return self._logger_ref()
 
     @abstractmethod
-    def apply(self, url: str) -> bool:
+    def apply(self, url: str, text: str="") -> bool:
         pass
 
     def _update_stats(self, passed: bool):
@@ -88,13 +88,13 @@ class FilterChain:
         self.filters.append(filter_)
         return self  # Enable method chaining
 
-    async def apply(self, url: str) -> bool:
+    async def apply(self, url: str, text: str="") -> bool:
         """Apply all filters concurrently when possible"""
         self.stats._counters[0] += 1  # Total processed URLs
 
         tasks = []
         for f in self.filters:
-            result = f.apply(url)
+            result = f.apply(url, text)
 
             if inspect.isawaitable(result):
                 tasks.append(result)  # Collect async tasks
@@ -204,7 +204,7 @@ class URLPatternFilter(URLFilter):
             )
 
     @lru_cache(maxsize=10000)
-    def apply(self, url: str) -> bool:
+    def apply(self, url: str, text: str="") -> bool:
         """Hierarchical pattern matching"""
         # Quick suffix check (*.html)
         if self._simple_suffixes:
@@ -387,7 +387,7 @@ class ContentTypeFilter(URLFilter):
 
         return ext in self._ext_map
 
-    def apply(self, url: str) -> bool:
+    def apply(self, url: str, text: str="") -> bool:
         """Fast extension check with caching"""
         result = self._check_url_cached(url)
         self._update_stats(result)
@@ -440,7 +440,7 @@ class DomainFilter(URLFilter):
         match = DomainFilter._DOMAIN_REGEX.search(url)
         return match.group(1).lower() if match else ""
 
-    def apply(self, url: str) -> bool:
+    def apply(self, url: str, text: str="") -> bool:
         """Optimized domain checking with early returns"""
         # Skip processing if no filters
         if not self._blocked_domains and self._allowed_domains is None:
@@ -491,12 +491,15 @@ class ContentRelevanceFilter(URLFilter):
         self.b = b  # Length normalization parameter
         self.avgdl = avgdl  # Average document length (empirical value)
 
-    async def apply(self, url: str) -> bool:
+    async def apply(self, url: str, text: str="") -> bool:
+        print(f"DEBUG: Applying ContentRelevanceFilter to URL: {url}")
         head_content = await HeadPeekr.peek_html(url)
         if not head_content:
+            print(f"DEBUG: No head content found for URL: {url}")
             self._update_stats(False)
             return False
-
+        
+        print(f"DEBUG: Head content: {head_content}")
         # Field extraction with weighting
         fields = {
             "title": HeadPeekr.get_title(head_content) or "",
@@ -506,6 +509,7 @@ class ContentRelevanceFilter(URLFilter):
 
         score = self._bm25(doc_text)
         decision = score >= self.threshold
+        print(f"DEBUG: Score: {score}, Decision: {decision}")
         self._update_stats(decision)
         return decision
 
@@ -579,7 +583,7 @@ class SEOFilter(URLFilter):
             else None
         )
 
-    async def apply(self, url: str) -> bool:
+    async def apply(self, url: str, text: str="") -> bool:
         head_content = await HeadPeekr.peek_html(url)
         if not head_content:
             self._update_stats(False)
