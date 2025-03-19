@@ -236,6 +236,7 @@ class URLPatternFilter(URLFilter):
         self._update_stats(False)
         return False
 
+from urllib.parse import urlparse
 
 class ContentTypeFilter(URLFilter):
     """Optimized content type filter using fast lookups"""
@@ -248,6 +249,7 @@ class ContentTypeFilter(URLFilter):
         "txt": "text/plain",
         "html": "text/html",
         "htm": "text/html",
+        "aspx": "text/html",
         "xhtml": "application/xhtml+xml",
         "css": "text/css",
         "csv": "text/csv",
@@ -337,20 +339,17 @@ class ContentTypeFilter(URLFilter):
     def _extract_extension(url: str) -> str:
         """Extracts file extension from a URL."""
         # Remove scheme (http://, https://) if present
-        if "://" in url:
-            url = url.split("://", 1)[-1]  # Get everything after '://'
-
-        # Remove domain (everything up to the first '/')
-        path_start = url.find("/")
-        path = url[path_start:] if path_start != -1 else ""
-
-        # Extract last filename in path
-        filename = path.rsplit("/", 1)[-1] if "/" in path else ""
+        parsed_url = urlparse(url)
+        if parsed_url.path == "":
+            return ""
+        elif "/" in parsed_url.path:
+            filename = parsed_url.path.split("/")[-1]
+        else:
+            filename = parsed_url.path
 
         # Extract and validate extension
         if "." not in filename:
             return ""
-
         return filename.rpartition(".")[-1].lower()
 
     def __init__(
@@ -375,7 +374,6 @@ class ContentTypeFilter(URLFilter):
             for ext, mime in self._MIME_MAP.items()
             if any(allowed in mime for allowed in self.allowed_types)
         )
-
     @lru_cache(maxsize=1000)
     def _check_url_cached(self, url: str) -> bool:
         """Cached URL checking"""
@@ -384,7 +382,6 @@ class ContentTypeFilter(URLFilter):
         ext = self._extract_extension(url)
         if not ext:
             return True
-
         return ext in self._ext_map
 
     def apply(self, url: str, text: str="") -> bool:
