@@ -51,7 +51,7 @@ class BestFirstCrawlingStrategy(DeepCrawlStrategy):
         self._cancel_event = asyncio.Event()
         self._pages_crawled = 0
 
-    async def can_process_url(self, url: str, depth: int) -> bool:
+    async def can_process_url(self, url: str, text: str, depth: int) -> bool:
         """
         Validate the URL format and apply filtering.
         For the starting URL (depth 0), filtering is bypassed.
@@ -68,7 +68,7 @@ class BestFirstCrawlingStrategy(DeepCrawlStrategy):
             self.logger.warning(f"Invalid URL: {url}, error: {e}")
             return False
 
-        if depth != 0 and not await self.filter_chain.apply(url):
+        if depth != 0 and not await self.filter_chain.apply(url, text):
             return False
 
         return True

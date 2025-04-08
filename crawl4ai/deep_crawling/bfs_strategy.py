@@ -43,7 +43,7 @@ class BFSDeepCrawlStrategy(DeepCrawlStrategy):
         self._cancel_event = asyncio.Event()
         self._pages_crawled = 0
 
-    async def can_process_url(self, url: str, depth: int) -> bool:
+    async def can_process_url(self, url: str, text: str, depth: int) -> bool:
         """
         Validates the URL and applies the filter chain.
         For the start URL (depth 0) filtering is bypassed.
@@ -60,7 +60,7 @@ class BFSDeepCrawlStrategy(DeepCrawlStrategy):
             self.logger.warning(f"Invalid URL: {url}, error: {e}")
             return False
 
-        if depth != 0 and not await self.filter_chain.apply(url):
+        if depth != 0 and not await self.filter_chain.apply(url, text):
             return False
 
         return True
@@ -100,12 +100,13 @@ class BFSDeepCrawlStrategy(DeepCrawlStrategy):
         # First collect all valid links
         for link in links:
             url = link.get("href")
+            text = link.get("text", "")
             # Strip URL fragments to avoid duplicate crawling
             # base_url = url.split('#')[0] if url else url
             base_url = normalize_url_for_deep_crawl(url, source_url)
             if base_url in visited:
                 continue
-            if not await self.can_process_url(url, next_depth):
+            if not await self.can_process_url(url, text, next_depth):
                 self.stats.urls_skipped += 1
                 continue
 
