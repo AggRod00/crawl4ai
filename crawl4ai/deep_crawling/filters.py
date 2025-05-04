@@ -116,6 +116,29 @@ class FilterChain:
         return True
 
 
+class SequentialFilterChain(FilterChain):
+    """Sequential filter chain"""
+
+    async def apply(self, url: str, text: str="") -> bool:
+        """
+        Evaluate filters strictly in the order they were added.
+        Stops at first rejection.  Still declared *async* so that
+        async filters can be awaited transparently.
+        """
+        self.logger.debug("Processing %s (sequential mode)", url)
+        self.stats._counters[0] += 1  # Total processed URLs
+
+        for f in self.filters:
+            res = f.apply(url, text)
+            if inspect.isawaitable(res):
+                res = await res           # wait before moving on
+            if not res:                   # rejected – short‑circuit
+                self.stats._counters[2] += 1
+                return False
+
+        self.stats._counters[1] += 1  # Passed
+        return True
+    
 class URLPatternFilter(URLFilter):
     """Pattern filter balancing speed and completeness"""
 
@@ -357,7 +380,7 @@ class ContentTypeFilter(URLFilter):
 
         # Extract and validate extension
         if "." not in filename:
-            return ""
+            return "html"
         return filename.rpartition(".")[-1].lower()
 
     def __init__(
