@@ -171,10 +171,7 @@ class AsyncDatabaseManager:
                             f"Code context:\n{error_context['code_context']}"
                         )
                         self.logger.error(
-                            message="{error}",
-                            tag="ERROR",
-                            params={"error": str(error_message)},
-                            boxes=["error"],
+                            message=create_box_message(error_message, type="error"),
                         )
 
                         raise
@@ -192,10 +189,7 @@ class AsyncDatabaseManager:
                 f"Code context:\n{error_context['code_context']}"
             )
             self.logger.error(
-                message="{error}",
-                tag="ERROR",
-                params={"error": str(error_message)},
-                boxes=["error"],
+                message=create_box_message(error_message, type="error"),
             )
             raise
         finally:
